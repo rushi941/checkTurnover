@@ -1,0 +1,21 @@
+{
+  "name": "turnover-check",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev -w @turnover/api\" \"npm run dev -w @turnover/web\"",
+    "dev:mobile": "concurrently -n api,web -c blue,green \"npm run dev -w @turnover/api\" \"npm run dev:mobile -w @turnover/web\"",
+    "dev:api": "npm run dev -w @turnover/api",
+    "dev:web": "npm run dev -w @turnover/web",
+    "build": "npm run build -w @turnover/shared && npm run build -w @turnover/api && npm run build -w @turnover/web",
+    "db:migrate": "npm run migrate -w @turnover/api",
+    "db:seed": "npm run seed -w @turnover/api",
+    "db:setup": "npm run db:migrate && npm run db:seed"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,0 +1,54 @@
+---
+description: Core TurnOverCheck project conventions — roles, stack, and doc references
+alwaysApply: true
+---
+
+# TurnOverCheck Project Rules
+
+## Product
+
+Shop & wholesaler app: daily sales/purchase, inventory, wholesaler-wise billing, turnover reports.
+
+**Roles:** `admin` | `shop` | `wholesaler`
+
+## Before coding
+
+1. Read relevant story in `docs/USER-STORIES.md`
+2. Check `docs/REQUIREMENTS.md` for scope
+3. Follow module boundaries in `docs/ARCHITECTURE.md`
+
+## Stack (default)
+
+- React + TypeScript + Vite (frontend)
+- shadcn/ui + Tailwind CSS
+- TanStack Query + TanStack Table
+- Node + Express + TypeScript (backend)
+- PostgreSQL via `pg` (raw SQL migrations — no Prisma)
+- JWT auth, RBAC middleware
+
+## Code conventions
+
+- TypeScript strict mode
+- API errors: `{ error: string, code?: string }` with proper HTTP status
+- Dates: store UTC, display in shop timezone (default Asia/Kolkata)
+- Money: store paise/cents as integer; never float for currency
+- Shop data isolation: every query filters by authenticated shop_id
+
+## File layout
+
+```
+apps/api/           Express API, pg pool, SQL migrations
+apps/web/           React + shadcn + TanStack
+packages/shared/    Shared TypeScript types
+docs/               Requirements, architecture, AI roadmap
+```
+
+## Commits
+
+Use conventional commits: `feat(shop):`, `fix(reports):`, `docs:`, `test:`
+
+## Do not
+
+- Commit secrets (.env)
+- Skip RBAC checks on shop-scoped endpoints
+- Add features outside current phase without updating REQUIREMENTS.md
