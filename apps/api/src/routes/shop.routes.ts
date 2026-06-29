@@ -11,6 +11,8 @@ import {
   recordPayment,
   listPayments,
   markPurchasePaid,
+  markPurchaseUnpaid,
+  setPurchasePaidAmount,
 } from '../services/purchase.service.js';
 import { upsertVakro, getVakro } from '../services/vakro.service.js';
 import { getDashboard, getMonthlyReport } from '../services/dashboard.service.js';
@@ -45,6 +47,13 @@ const purchaseSchema = z.object({
   date: isoDateSchema.optional(),
   note: z.string().optional(),
   paidAmount: z.number().min(0).optional(),
+});
+
+const setPaidAmountSchema = z.object({
+  paidAmount: z.number().min(0),
+  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  paymentMode: z.enum(['cash', 'upi', 'card', 'bank']).optional(),
+  note: z.string().optional(),
 });
 
 const paymentSchema = z.object({
@@ -104,6 +113,7 @@ shopRouter.get('/purchases', async (req, res, next) => {
       to: req.query.to as string | undefined,
       source: req.query.source as string | undefined,
       search: req.query.search as string | undefined,
+      paymentStatus: req.query.paymentStatus as string | undefined,
       sort: req.query.sort as string | undefined,
       page: req.query.page ? parseInt(String(req.query.page), 10) : 1,
       limit: req.query.limit ? parseInt(String(req.query.limit), 10) : 50,
@@ -121,6 +131,7 @@ shopRouter.get('/purchases/summary', async (req, res, next) => {
       to: req.query.to as string | undefined,
       source: req.query.source as string | undefined,
       search: req.query.search as string | undefined,
+      paymentStatus: req.query.paymentStatus as string | undefined,
     });
     res.json({ data });
   } catch (err) {
@@ -223,6 +234,41 @@ shopRouter.post('/purchases/:purchaseId/mark-paid', async (req, res, next) => {
     }
     res.json({ data });
   } catch (err) {
+    next(err);
+  }
+});
+
+shopRouter.post('/purchases/:purchaseId/mark-unpaid', async (req, res, next) => {
+  try {
+    const data = await markPurchaseUnpaid(getShopId(req), getPurchaseId(req));
+    if (!data) {
+      res.status(404).json({ error: 'Purchase not found', code: 'NOT_FOUND' });
+      return;
+    }
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+shopRouter.put('/purchases/:purchaseId/paid-amount', async (req, res, next) => {
+  try {
+    const parsed = setPaidAmountSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Validation failed', code: 'VALIDATION' });
+      return;
+    }
+    const data = await setPurchasePaidAmount(getShopId(req), getPurchaseId(req), parsed.data);
+    if (!data) {
+      res.status(404).json({ error: 'Purchase not found', code: 'NOT_FOUND' });
+      return;
+    }
+    res.json({ data });
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('Paid amount must be')) {
+      res.status(400).json({ error: err.message, code: 'INVALID_PAID_AMOUNT' });
+      return;
+    }
     next(err);
   }
 });

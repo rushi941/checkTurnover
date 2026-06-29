@@ -103,7 +103,7 @@ export async function deletePurchase(shopId: string, purchaseId: string) {
 
 function buildPurchaseFilters(
   shopId: string,
-  opts: { from?: string; to?: string; source?: string; search?: string },
+  opts: { from?: string; to?: string; source?: string; search?: string; paymentStatus?: string },
 ) {
   const conditions = ['shop_id = $1'];
   const params: unknown[] = [shopId];
@@ -125,6 +125,13 @@ function buildPurchaseFilters(
     conditions.push(`source_name ILIKE $${i++}`);
     params.push(`%${opts.search}%`);
   }
+  if (opts.paymentStatus === 'paid') {
+    conditions.push('paid_amount_paise >= amount_paise AND amount_paise > 0');
+  } else if (opts.paymentStatus === 'partial') {
+    conditions.push('paid_amount_paise > 0 AND paid_amount_paise < amount_paise');
+  } else if (opts.paymentStatus === 'pending' || opts.paymentStatus === 'unpaid') {
+    conditions.push('paid_amount_paise = 0');
+  }
 
   return { where: conditions.join(' AND '), params, nextIndex: i };
 }
@@ -136,6 +143,7 @@ export async function listPurchases(
     to?: string;
     source?: string;
     search?: string;
+    paymentStatus?: string;
     sort?: string;
     page?: number;
     limit?: number;
@@ -171,7 +179,7 @@ export async function listPurchases(
 
 export async function getPurchasesSummary(
   shopId: string,
-  opts: { from?: string; to?: string; source?: string; search?: string },
+  opts: { from?: string; to?: string; source?: string; search?: string; paymentStatus?: string },
 ): Promise<PurchasesSummary> {
   const { where, params } = buildPurchaseFilters(shopId, opts);
 
@@ -239,4 +247,4 @@ export async function listPurchaseSources(shopId: string) {
   return rows.map((r) => r.name);
 }
 
-export { recordPayment, listPayments, markPurchasePaid } from './payment.service.js';
+export { recordPayment, listPayments, markPurchasePaid, markPurchaseUnpaid, setPurchasePaidAmount } from './payment.service.js';

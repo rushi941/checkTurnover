@@ -103,3 +103,114 @@ export async function markPurchasePaid(
     note: input?.note ?? 'Marked as fully paid',
   });
 }
+
+export async function markPurchaseUnpaid(shopId: string, purchaseId: string) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const purchaseRes = await client.query(
+      'SELECT * FROM daily_purchases WHERE id = $1 AND shop_id = $2 FOR UPDATE',
+      [purchaseId, shopId],
+    );
+    if (purchaseRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    await client.query(
+      'DELETE FROM purchase_payments WHERE purchase_id = $1 AND shop_id = $2',
+      [purchaseId, shopId],
+    );
+
+    const { rows } = await client.query(
+      `UPDATE daily_purchases
+       SET paid_amount_paise = 0, updated_at = NOW()
+       WHERE id = $1 AND shop_id = $2
+       RETURNING *`,
+      [purchaseId, shopId],
+    );
+
+    await client.query('COMMIT');
+    return mapPurchase(rows[0] as never);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/** Set total paid amount directly (0 = unpaid, partial, or full). Replaces payment history. */
+export async function setPurchasePaidAmount(
+  shopId: string,
+  purchaseId: string,
+  input: {
+    paidAmount: number;
+    paymentDate?: string;
+    paymentMode?: string;
+    note?: string;
+  },
+) {
+  const newPaidPaise = rupeesToPaise(input.paidAmount);
+  const paymentDate = input.paymentDate ?? todayIso();
+  const paymentMode = input.paymentMode ?? 'cash';
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const purchaseRes = await client.query(
+      'SELECT * FROM daily_purchases WHERE id = $1 AND shop_id = $2 FOR UPDATE',
+      [purchaseId, shopId],
+    );
+    if (purchaseRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    const totalPaise = Number(
+      (purchaseRes.rows[0] as { amount_paise: string }).amount_paise,
+    );
+    if (newPaidPaise < 0 || newPaidPaise > totalPaise) {
+      await client.query('ROLLBACK');
+      throw new Error(`Paid amount must be between 0 and ${totalPaise / 100} ₹`);
+    }
+
+    await client.query(
+      'DELETE FROM purchase_payments WHERE purchase_id = $1 AND shop_id = $2',
+      [purchaseId, shopId],
+    );
+
+    if (newPaidPaise > 0) {
+      await client.query(
+        `INSERT INTO purchase_payments (purchase_id, shop_id, amount_paise, payment_date, payment_mode, note)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          purchaseId,
+          shopId,
+          newPaidPaise,
+          paymentDate,
+          paymentMode,
+          input.note ?? 'Manual paid amount',
+        ],
+      );
+    }
+
+    const { rows } = await client.query(
+      `UPDATE daily_purchases
+       SET paid_amount_paise = $1, updated_at = NOW()
+       WHERE id = $2 AND shop_id = $3
+       RETURNING *`,
+      [newPaidPaise, purchaseId, shopId],
+    );
+
+    await client.query('COMMIT');
+    return mapPurchase(rows[0] as never);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}

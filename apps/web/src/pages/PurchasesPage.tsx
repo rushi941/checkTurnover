@@ -44,12 +44,20 @@ import type { DailyPurchase, PaymentStatus, PurchasesSummary } from '@turnover/s
 
 type DatePreset = 'today' | 'week' | 'month' | 'all';
 type ViewMode = 'by-store' | 'all-entries';
+type PaymentFilter = 'all' | 'unpaid' | 'partial' | 'paid';
 
 const DATE_PRESETS: { id: DatePreset; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'week', label: 'Week' },
   { id: 'month', label: 'Month' },
   { id: 'all', label: 'All' },
+];
+
+const PAYMENT_FILTERS: { id: PaymentFilter; label: string }[] = [
+  { id: 'all', label: 'All bills' },
+  { id: 'unpaid', label: 'Not paid' },
+  { id: 'partial', label: 'Partial' },
+  { id: 'paid', label: 'Paid' },
 ];
 
 function presetRange(preset: DatePreset): { from?: string; to?: string } {
@@ -97,6 +105,7 @@ function FilterChip({
 export function PurchasesPage() {
   const shopId = useShopId();
   const [preset, setPreset] = useState<DatePreset>('month');
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
   const [source, setSource] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('by-store');
@@ -112,6 +121,7 @@ export function PurchasesPage() {
   if (range.to) queryParams.set('to', range.to);
   if (effectiveSource) queryParams.set('source', effectiveSource);
   if (debouncedSearch) queryParams.set('search', debouncedSearch);
+  if (paymentFilter !== 'all') queryParams.set('paymentStatus', paymentFilter);
   const qs = queryParams.toString();
 
   const { data: summary, isFetching: summaryFetching } = useQuery({
@@ -172,12 +182,11 @@ export function PurchasesPage() {
       {
         id: 'actions',
         header: '',
-        cell: ({ row }) =>
-          row.original.pendingPaise > 0 ? (
-            <Button size="sm" variant="outline" onClick={() => setPayPurchase(row.original)}>
-              Pay
-            </Button>
-          ) : null,
+        cell: ({ row }) => (
+          <Button size="sm" variant="outline" onClick={() => setPayPurchase(row.original)}>
+            {row.original.pendingPaise > 0 ? 'Pay' : 'Manage'}
+          </Button>
+        ),
       },
     ],
     [],
@@ -293,6 +302,17 @@ export function PurchasesPage() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input className="pl-9" placeholder="Search store…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+        </div>
+        <div
+          role="group"
+          aria-label="Payment status"
+          className="grid h-auto w-full grid-cols-4 rounded-lg bg-muted p-1 sm:inline-flex sm:w-auto"
+        >
+          {PAYMENT_FILTERS.map(({ id, label }) => (
+            <FilterChip key={id} active={paymentFilter === id} onClick={() => setPaymentFilter(id)}>
+              {label}
+            </FilterChip>
+          ))}
         </div>
         {isRefreshing && (
           <p className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -428,16 +448,14 @@ export function PurchasesPage() {
                           </p>
                         </div>
                       </div>
-                      {entry.pendingPaise > 0 && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="mt-3 w-full"
-                          onClick={() => setPayPurchase(entry)}
-                        >
-                          Record payment
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-3 w-full"
+                        onClick={() => setPayPurchase(entry)}
+                      >
+                        {entry.pendingPaise > 0 ? 'Record payment' : 'Manage payment'}
+                      </Button>
                     </CardContent>
                   </Card>
                 ))

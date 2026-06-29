@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { apiFetch, shopPath } from '@/lib/api';
 import { useShopId } from '@/contexts/AuthContext';
+import { todayIso } from '@/lib/utils';
 import type { DailyPurchase } from '@turnover/shared';
 
 interface Props {
@@ -29,6 +30,7 @@ export function AddPurchaseDialog({ defaultDate, trigger }: Props) {
   const [open, setOpen] = useState(false);
   const [sourceName, setSourceName] = useState('');
   const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(defaultDate ?? todayIso());
   const [paidAmount, setPaidAmount] = useState('');
   const [note, setNote] = useState('');
 
@@ -39,7 +41,7 @@ export function AddPurchaseDialog({ defaultDate, trigger }: Props) {
         body: JSON.stringify({
           sourceName,
           amount: parseFloat(amount),
-          date: defaultDate,
+          date,
           note: note || undefined,
           paidAmount: paidAmount ? parseFloat(paidAmount) : undefined,
         }),
@@ -52,6 +54,7 @@ export function AddPurchaseDialog({ defaultDate, trigger }: Props) {
       setOpen(false);
       setSourceName('');
       setAmount('');
+      setDate(defaultDate ?? todayIso());
       setPaidAmount('');
       setNote('');
     },
@@ -71,9 +74,21 @@ export function AddPurchaseDialog({ defaultDate, trigger }: Props) {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add purchase</DialogTitle>
-          <DialogDescription>Enter source shop name and purchase amount (₹).</DialogDescription>
+          <DialogDescription>
+            Enter source shop, amount, and date. Add old bills with a past date.
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
+          <div className="grid gap-2">
+            <Label htmlFor="date">Bill date</Label>
+            <Input
+              id="date"
+              type="date"
+              max={todayIso()}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </div>
           <div className="grid gap-2">
             <Label htmlFor="source">Source shop name</Label>
             <Input

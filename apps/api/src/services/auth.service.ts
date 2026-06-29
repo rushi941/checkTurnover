@@ -93,6 +93,26 @@ export async function createShopWithUser(input: {
   return { shopId };
 }
 
+export async function resetUserPassword(userId: string, password: string) {
+  const hash = await bcrypt.hash(password, 10);
+  const { rowCount } = await query(
+    `UPDATE users SET password_hash = $1, updated_at = NOW()
+     WHERE id = $2 AND status = 'active'`,
+    [hash, userId],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
+export async function resetShopOwnerPassword(shopId: string, password: string) {
+  const { rows } = await query<{ id: string }>(
+    `SELECT id FROM users WHERE shop_id = $1 AND role = 'shop' LIMIT 1`,
+    [shopId],
+  );
+  const owner = rows[0];
+  if (!owner) return false;
+  return resetUserPassword(owner.id, password);
+}
+
 export async function listShops() {
   const { rows } = await query<{
     id: string;
@@ -101,8 +121,10 @@ export async function listShops() {
     gstin: string | null;
     invoice_prefix: string;
     owner_email: string | null;
+    owner_user_id: string | null;
   }>(
-    `SELECT s.id, s.name, s.address, s.gstin, s.invoice_prefix, u.email AS owner_email
+    `SELECT s.id, s.name, s.address, s.gstin, s.invoice_prefix,
+            u.email AS owner_email, u.id AS owner_user_id
      FROM shops s
      LEFT JOIN users u ON u.shop_id = s.id AND u.role = 'shop'
      ORDER BY s.created_at DESC`,
@@ -114,5 +136,6 @@ export async function listShops() {
     gstin: r.gstin,
     invoicePrefix: r.invoice_prefix,
     ownerEmail: r.owner_email,
+    ownerUserId: r.owner_user_id,
   }));
 }
