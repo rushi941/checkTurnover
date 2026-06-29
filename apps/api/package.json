@@ -12,6 +12,12 @@
   },
   "dependencies": {
     "@turnover/shared": "*",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.18",
+    "@types/express": "^5.0.2",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.15.21",
+    "@types/pg": "^8.15.2",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
@@ -20,16 +26,8 @@
     "jsonwebtoken": "^9.0.2",
     "panchang-ts": "^4.3.1",
     "pg": "^8.16.0",
-    "zod": "^3.25.51"
-  },
-  "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/cors": "^2.8.18",
-    "@types/express": "^5.0.2",
-    "@types/jsonwebtoken": "^9.0.9",
-    "@types/node": "^22.15.21",
-    "@types/pg": "^8.15.2",
     "tsx": "^4.19.4",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "zod": "^3.25.51"
   }
 }

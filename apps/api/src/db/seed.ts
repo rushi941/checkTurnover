@@ -1,7 +1,10 @@
 import bcrypt from 'bcryptjs';
+import type pg from 'pg';
 import { addDaysIso, todayIso } from '@turnover/shared';
 import { config } from '../config.js';
 import { pool } from './pool.js';
+
+type DbClient = pg.PoolClient;
 
 const seedConfig = {
   adminEmail: process.env.SEED_ADMIN_EMAIL ?? 'rushisheth941@gmail.com',
@@ -15,7 +18,7 @@ function daysAgo(n: number): string {
   return addDaysIso(todayIso(), -n);
 }
 
-async function removeDemoData(client: Awaited<ReturnType<typeof pool.connect>>) {
+async function removeDemoData(client: DbClient) {
   const demoShop = await client.query<{ id: string }>(
     "SELECT id FROM shops WHERE name = 'Demo Kirana Store' LIMIT 1",
   );
@@ -36,7 +39,7 @@ async function removeDemoData(client: Awaited<ReturnType<typeof pool.connect>>) 
 }
 
 async function seedKharchoSamples(
-  client: Awaited<ReturnType<typeof pool.connect>>,
+  client: DbClient,
   shopId: string,
   month: string,
 ) {
@@ -61,7 +64,7 @@ async function seedKharchoSamples(
   }
 }
 
-async function seedShopData(client: Awaited<ReturnType<typeof pool.connect>>, shopId: string) {
+async function seedShopData(client: DbClient, shopId: string) {
   const month = todayIso().slice(0, 7);
 
   const purchaseCount = await client.query<{ count: string }>(

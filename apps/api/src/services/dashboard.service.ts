@@ -78,11 +78,13 @@ export async function getMonthlyReport(shopId: string, month: string): Promise<M
     [shopId, from, to],
   );
 
-  const purchaseMap = new Map(
+  const purchaseMap = new Map<string, number>(
     purchaseByDay.rows.map((r) => [r.date.slice(0, 10), Number(r.total)]),
   );
-  const vakroMap = new Map(vakroByDay.rows.map((r) => [r.date.slice(0, 10), Number(r.total)]));
-  const kharchoMap = new Map(
+  const vakroMap = new Map<string, number>(
+    vakroByDay.rows.map((r) => [r.date.slice(0, 10), Number(r.total)]),
+  );
+  const kharchoMap = new Map<string, number>(
     kharchoByDay.rows.map((r) => [r.date.slice(0, 10), Number(r.total)]),
   );
 
