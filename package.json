@@ -11,9 +11,13 @@
     "dev:api": "npm run dev -w @turnover/api",
     "dev:web": "npm run dev -w @turnover/web",
     "build": "npm run build -w @turnover/shared && npm run build -w @turnover/api && npm run build -w @turnover/web",
+    "start": "npm run db:migrate && npm run start -w @turnover/api",
     "db:migrate": "npm run migrate -w @turnover/api",
     "db:seed": "npm run seed -w @turnover/api",
     "db:setup": "npm run db:migrate && npm run db:seed"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
