@@ -1,7 +1,6 @@
 import bcrypt from 'bcryptjs';
 import type pg from 'pg';
 import { addDaysIso, todayIso } from '@turnover/shared';
-import { config } from '../config.js';
 import { pool } from './pool.js';
 
 type DbClient = pg.PoolClient;
@@ -189,8 +188,7 @@ async function seed() {
       );
       console.log(`Created admin: ${seedConfig.adminEmail}`);
     } else {
-      await client.query('UPDATE users SET password_hash = $1 WHERE email = $2', [adminHash, adminEmail]);
-      console.log(`Admin ready: ${seedConfig.adminEmail}`);
+      console.log(`Admin already exists: ${seedConfig.adminEmail}`);
     }
 
     const shopUser = await client.query<{ shop_id: string | null }>(
@@ -227,19 +225,24 @@ async function seed() {
     await seedShopData(client, shopId);
 
     console.log('Seed complete.');
-    if (config.nodeEnv === 'development') {
-      console.log('');
-      console.log('Test logins (change via SEED_* in .env):');
-      console.log(`  Admin: ${seedConfig.adminEmail} / ${seedConfig.adminPassword}`);
-      console.log(`  Shop:  ${seedConfig.shopEmail} / ${seedConfig.shopPassword}`);
-    }
+    console.log(`Admin login: ${seedConfig.adminEmail}`);
+    console.log(`Shop login:  ${seedConfig.shopEmail}`);
+    console.log('(Passwords are from SEED_ADMIN_PASSWORD / SEED_SHOP_PASSWORD in Render env)');
   } finally {
     client.release();
-    await pool.end();
   }
 }
 
-seed().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+export async function runSeed(): Promise<void> {
+  await seed();
+}
+
+const isDirectRun = process.argv[1]?.includes('seed');
+if (isDirectRun) {
+  runSeed()
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    })
+    .finally(() => pool.end());
+}
