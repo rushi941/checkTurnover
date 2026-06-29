@@ -30,6 +30,7 @@ import {
   listKharcho,
   getKharchoSummary,
 } from '../services/kharcho.service.js';
+import { createInvoice, listInvoices, getShopForInvoice } from '../services/invoice.service.js';
 import { getPurchaseId, getKharchoId, getShopId } from '../utils/params.js';
 import { isDateNotFuture, isValidIsoDate, todayIso, currentMonth } from '../utils/dates.js';
 
@@ -77,6 +78,14 @@ const vakroSchema = z.object({
   amount: z.number().min(0),
   date: isoDateSchema.optional(),
   note: z.string().max(500).optional(),
+});
+
+const invoiceSchema = z.object({
+  customerName: z.string().min(1),
+  description: z.string().optional(),
+  amount: z.number().positive(),
+  date: isoDateSchema.optional(),
+  gstPercent: z.number().min(0).max(28).optional(),
 });
 
 const kharchoCategorySchema = z.enum([
@@ -345,6 +354,51 @@ shopRouter.put('/vakro', async (req, res, next) => {
     }
     const data = await upsertVakro(getShopId(req), parsed.data);
     res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+shopRouter.get('/invoices', async (req, res, next) => {
+  try {
+    const data = await listInvoices(getShopId(req));
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+shopRouter.get('/invoices/shop-profile', async (req, res, next) => {
+  try {
+    const data = await getShopForInvoice(getShopId(req));
+    if (!data) {
+      res.status(404).json({ error: 'Shop not found', code: 'NOT_FOUND' });
+      return;
+    }
+    res.json({
+      data: {
+        name: data.name,
+        address: data.address,
+        gstin: data.gstin,
+        ownerName: data.owner_name,
+        phone: data.phone,
+        city: data.city,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+shopRouter.post('/invoices', async (req, res, next) => {
+  try {
+    const parsed = invoiceSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Validation failed', code: 'VALIDATION' });
+      return;
+    }
+    const data = await createInvoice(getShopId(req), parsed.data);
+    res.status(201).json({ data });
   } catch (err) {
     next(err);
   }

@@ -1,15 +1,20 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ShoppingCart, Wallet, TrendingUp, Clock, Truck, Receipt } from 'lucide-react';
+import { ShoppingCart, Wallet, TrendingUp, Clock, Truck, Receipt, Share2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatCardPaise } from '@/components/dashboard/StatCard';
 import { MonthlyTargetCard } from '@/components/dashboard/MonthlyTargetCard';
+import { OnboardingChecklist } from '@/components/onboarding/OnboardingChecklist';
 import { AddPurchaseDialog } from '@/components/purchases/AddPurchaseDialog';
 import { AddKharchoDialog } from '@/components/kharcho/AddKharchoDialog';
+import { PageLoader } from '@/components/ui/loader';
 import { apiFetch, shopPath } from '@/lib/api';
-import { useShopId } from '@/contexts/AuthContext';
+import { useAuth, useShopId } from '@/contexts/AuthContext';
+import { useMonthlyTarget } from '@/hooks/useMonthlyTarget';
+import { buildDailySummaryMessage, openWhatsAppShare } from '@/lib/whatsapp';
 import { currentMonth, formatInrFromPaise, monthStartEnd, todayIso } from '@/lib/utils';
 import type { DashboardData, PaymentStatus, PurchasesSummary } from '@turnover/shared';
 
@@ -21,11 +26,12 @@ function StatusBadge({ status }: { status: PaymentStatus }) {
 
 export function DashboardPage() {
   const shopId = useShopId();
+  const { shop } = useAuth();
   const date = todayIso();
   const month = currentMonth();
   const { from, to } = monthStartEnd(month);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['dashboard', shopId, date],
     queryFn: () =>
       apiFetch<{ data: DashboardData }>(shopPath(shopId, `/dashboard?date=${date}`)).then(
@@ -43,24 +49,36 @@ export function DashboardPage() {
     placeholderData: keepPreviousData,
   });
 
+  const { data: targetProgress } = useMonthlyTarget(month);
+
   if (isLoading && !data) {
-    return <div className="text-muted-foreground">Loading dashboard…</div>;
+    return <PageLoader label="Loading dashboard…" />;
   }
 
-  if (!data) {
+  if (isError || !data) {
     return <div className="text-sm text-destructive">Could not load dashboard.</div>;
   }
 
   const d = data;
 
+  function shareWhatsApp() {
+    const text = buildDailySummaryMessage(shop?.name ?? 'My shop', date, d);
+    openWhatsAppShare(text, shop?.phone ?? undefined);
+    toast.success('Opening WhatsApp…');
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold tracking-tight sm:text-2xl">Dashboard</h1>
           <p className="text-muted-foreground">Today · {date}</p>
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button variant="outline" className="w-full sm:w-auto gap-2" onClick={shareWhatsApp}>
+            <Share2 className="h-4 w-4" />
+            Share on WhatsApp
+          </Button>
           <AddPurchaseDialog defaultDate={date} />
           <AddKharchoDialog defaultDate={date} />
           <Button variant="outline" className="w-full sm:w-auto" asChild>
@@ -68,6 +86,12 @@ export function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      <OnboardingChecklist
+        shopId={shopId}
+        dashboard={d}
+        hasMonthlyTarget={(targetProgress?.targetPaise ?? 0) > 0}
+      />
 
       <MonthlyTargetCard />
 

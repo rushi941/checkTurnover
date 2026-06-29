@@ -1,9 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AppShell } from '@/components/layout/AppShell';
+import { PageLoader } from '@/components/ui/loader';
 import { LoginPage } from '@/pages/LoginPage';
+import { ForgotPasswordPage } from '@/pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '@/pages/ResetPasswordPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { PurchasesPage } from '@/pages/PurchasesPage';
 import { VakroPage } from '@/pages/VakroPage';
@@ -16,7 +19,16 @@ import { AdminPage } from '@/pages/AdminPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 30_000, retry: 1 },
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+    },
+    mutations: {
+      onError: (err) => {
+        const message = err instanceof Error ? err.message : 'Something went wrong';
+        toast.error(message);
+      },
+    },
   },
 });
 
@@ -24,11 +36,7 @@ function ProtectedRoutes() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Loading…</p>
-      </div>
-    );
+    return <PageLoader fullScreen label="Signing in…" />;
   }
 
   if (!user) return <Navigate to="/login" replace />;
@@ -73,10 +81,12 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/*" element={<ProtectedRoutes />} />
           </Routes>
         </BrowserRouter>
-        <Toaster richColors position="top-center" closeButton />
+        <Toaster richColors position="top-center" closeButton expand duration={3500} />
       </AuthProvider>
     </QueryClientProvider>
   );

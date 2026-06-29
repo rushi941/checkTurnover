@@ -1,7 +1,32 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { query } from '../db/pool.js';
 import { signToken } from '../middleware/auth.js';
 import type { AuthResponse, User, Shop } from '@turnover/shared';
+
+const RESET_TOKEN_HOURS = 24;
+
+function mapShopRow(s: {
+  id: string;
+  name: string;
+  address: string | null;
+  gstin: string | null;
+  invoice_prefix: string;
+  owner_name?: string | null;
+  phone?: string | null;
+  city?: string | null;
+}): Shop {
+  return {
+    id: s.id,
+    name: s.name,
+    address: s.address,
+    gstin: s.gstin,
+    invoicePrefix: s.invoice_prefix,
+    ownerName: s.owner_name ?? null,
+    phone: s.phone ?? null,
+    city: s.city ?? null,
+  };
+}
 
 export async function login(email: string, password: string): Promise<AuthResponse | null> {
   const { rows } = await query<{
@@ -32,19 +57,16 @@ export async function login(email: string, password: string): Promise<AuthRespon
       address: string | null;
       gstin: string | null;
       invoice_prefix: string;
-    }>('SELECT id, name, address, gstin, invoice_prefix FROM shops WHERE id = $1', [
-      user.shop_id,
-    ]);
+      owner_name: string | null;
+      phone: string | null;
+      city: string | null;
+    }>(
+      `SELECT id, name, address, gstin, invoice_prefix, owner_name, phone, city
+       FROM shops WHERE id = $1`,
+      [user.shop_id],
+    );
     const s = shopRes.rows[0];
-    if (s) {
-      shop = {
-        id: s.id,
-        name: s.name,
-        address: s.address,
-        gstin: s.gstin,
-        invoicePrefix: s.invoice_prefix,
-      };
-    }
+    if (s) shop = mapShopRow(s);
   }
 
   const token = signToken({
@@ -73,14 +95,25 @@ export async function createShopWithUser(input: {
   name: string;
   email: string;
   password: string;
+  ownerName?: string;
+  phone?: string;
   address?: string;
+  city?: string;
   gstin?: string;
 }) {
   const hash = await bcrypt.hash(input.password, 10);
 
   const shopRes = await query<{ id: string }>(
-    `INSERT INTO shops (name, address, gstin) VALUES ($1, $2, $3) RETURNING id`,
-    [input.name, input.address ?? null, input.gstin ?? null],
+    `INSERT INTO shops (name, owner_name, phone, address, city, gstin)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    [
+      input.name,
+      input.ownerName?.trim() ?? null,
+      input.phone?.trim() ?? null,
+      input.address?.trim() ?? null,
+      input.city?.trim() ?? null,
+      input.gstin?.trim() ?? null,
+    ],
   );
   const shopId = shopRes.rows[0].id;
 
@@ -91,6 +124,62 @@ export async function createShopWithUser(input: {
   );
 
   return { shopId };
+}
+
+export async function createPasswordResetToken(email: string): Promise<string | null> {
+  const { rows } = await query<{ id: string }>(
+    `SELECT id FROM users WHERE email = $1 AND status = 'active'`,
+    [email.toLowerCase()],
+  );
+  const user = rows[0];
+  if (!user) return null;
+  return createPasswordResetTokenByUserId(user.id);
+}
+
+export async function createPasswordResetForUser(userId: string): Promise<string | null> {
+  const { rows } = await query<{ id: string }>(
+    `SELECT id FROM users WHERE id = $1 AND status = 'active'`,
+    [userId],
+  );
+  if (rows.length === 0) return null;
+  return createPasswordResetTokenByUserId(userId);
+}
+
+async function createPasswordResetTokenByUserId(userId: string): Promise<string> {
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_HOURS * 60 * 60 * 1000);
+
+  await query(
+    `UPDATE password_reset_tokens SET used_at = NOW()
+     WHERE user_id = $1 AND used_at IS NULL`,
+    [userId],
+  );
+
+  await query(
+    `INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)`,
+    [userId, token, expiresAt.toISOString()],
+  );
+
+  return token;
+}
+
+export async function resetPasswordWithToken(token: string, password: string): Promise<boolean> {
+  const { rows } = await query<{ user_id: string }>(
+    `SELECT user_id FROM password_reset_tokens
+     WHERE token = $1 AND used_at IS NULL AND expires_at > NOW()`,
+    [token],
+  );
+  const row = rows[0];
+  if (!row) return false;
+
+  const ok = await resetUserPassword(row.user_id, password);
+  if (!ok) return false;
+
+  await query(
+    `UPDATE password_reset_tokens SET used_at = NOW() WHERE token = $1`,
+    [token],
+  );
+  return true;
 }
 
 export async function resetUserPassword(userId: string, password: string) {
@@ -120,10 +209,14 @@ export async function listShops() {
     address: string | null;
     gstin: string | null;
     invoice_prefix: string;
+    owner_name: string | null;
+    phone: string | null;
+    city: string | null;
     owner_email: string | null;
     owner_user_id: string | null;
   }>(
     `SELECT s.id, s.name, s.address, s.gstin, s.invoice_prefix,
+            s.owner_name, s.phone, s.city,
             u.email AS owner_email, u.id AS owner_user_id
      FROM shops s
      LEFT JOIN users u ON u.shop_id = s.id AND u.role = 'shop'
@@ -135,6 +228,9 @@ export async function listShops() {
     address: r.address,
     gstin: r.gstin,
     invoicePrefix: r.invoice_prefix,
+    ownerName: r.owner_name,
+    phone: r.phone,
+    city: r.city,
     ownerEmail: r.owner_email,
     ownerUserId: r.owner_user_id,
   }));

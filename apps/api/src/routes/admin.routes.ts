@@ -6,6 +6,7 @@ import {
   listShops,
   resetShopOwnerPassword,
   resetUserPassword,
+  createPasswordResetForUser,
 } from '../services/auth.service.js';
 
 export const adminRouter = Router();
@@ -16,7 +17,10 @@ const createShopSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(6),
+  ownerName: z.string().optional(),
+  phone: z.string().optional(),
   address: z.string().optional(),
+  city: z.string().optional(),
   gstin: z.string().optional(),
 });
 
@@ -59,6 +63,20 @@ adminRouter.put('/shops/:shopId/password', async (req, res) => {
     return;
   }
   res.json({ data: { ok: true } });
+});
+
+adminRouter.post('/users/:userId/reset-link', async (req, res) => {
+  const token = await createPasswordResetForUser(req.params.userId);
+  if (!token) {
+    res.status(404).json({ error: 'User not found', code: 'NOT_FOUND' });
+    return;
+  }
+  res.json({
+    data: {
+      token,
+      path: `/reset-password?token=${token}`,
+    },
+  });
 });
 
 adminRouter.put('/users/:userId/password', async (req, res) => {

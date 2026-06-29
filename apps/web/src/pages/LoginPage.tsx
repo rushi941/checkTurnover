@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageLoader, InlineLoader } from '@/components/ui/loader';
 import { useAuth, ApiError } from '@/contexts/AuthContext';
 
 export function LoginPage() {
@@ -16,11 +17,7 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900">
-        <p className="text-white/70">Loading…</p>
-      </div>
-    );
+    return <PageLoader fullScreen label="Loading…" />;
   }
 
   if (user) {
@@ -42,7 +39,7 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-4">
-      <Card className="w-full max-w-md shadow-2xl">
+      <Card className="w-full max-w-md animate-in fade-in zoom-in-95 shadow-2xl duration-500">
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 text-xl font-bold text-sky-400">
             T
@@ -90,10 +87,22 @@ export function LoginPage() {
               </div>
             </div>
             <Button type="submit" className="w-full" disabled={submitting}>
-              Sign in
+              {submitting ? (
+                <span className="flex items-center gap-2">
+                  <InlineLoader className="text-primary-foreground" />
+                  Signing in…
+                </span>
+              ) : (
+                'Sign in'
+              )}
             </Button>
           </form>
-          <p className="mt-4 text-center text-xs text-muted-foreground">
+          <p className="mt-3 text-center text-sm">
+            <Link to="/forgot-password" className="text-primary underline">
+              Forgot password?
+            </Link>
+          </p>
+          <p className="mt-2 text-center text-xs text-muted-foreground">
             Use your shop or admin credentials from setup.
           </p>
         </CardContent>

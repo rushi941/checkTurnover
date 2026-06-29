@@ -57,6 +57,42 @@ export interface Shop {
   address: string | null;
   gstin: string | null;
   invoicePrefix: string;
+  ownerName?: string | null;
+  phone?: string | null;
+  city?: string | null;
+}
+
+export interface GstInvoiceLine {
+  description: string;
+  customerName: string;
+  amountPaise: number;
+}
+
+export interface GstInvoice {
+  id: string;
+  shopId: string;
+  invoiceNo: string;
+  date: string;
+  lines: GstInvoiceLine[];
+  taxableTotalPaise: number;
+  cgstPaise: number;
+  sgstPaise: number;
+  igstPaise: number;
+  grandTotalPaise: number;
+  createdAt: string;
+}
+
+export interface AdminShop {
+  id: string;
+  name: string;
+  address: string | null;
+  gstin: string | null;
+  invoicePrefix: string;
+  ownerName: string | null;
+  phone: string | null;
+  city: string | null;
+  ownerEmail: string | null;
+  ownerUserId: string | null;
 }
 
 export interface AuthResponse {
