@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/table';
 import { AddPurchaseDialog } from '@/components/purchases/AddPurchaseDialog';
 import { RecordPaymentDialog } from '@/components/purchases/RecordPaymentDialog';
+import { PayStoreDialog } from '@/components/purchases/PayStoreDialog';
 import { DataImportExport } from '@/components/data/DataImportExport';
 import { apiFetch, shopPath } from '@/lib/api';
 import { useShopId } from '@/contexts/AuthContext';
@@ -40,7 +41,7 @@ import {
   startOfWeekIso,
   todayIso,
 } from '@/lib/utils';
-import type { DailyPurchase, PaymentStatus, PurchasesSummary } from '@turnover/shared';
+import type { DailyPurchase, PaymentStatus, PurchaseSourceSummary, PurchasesSummary } from '@turnover/shared';
 
 type DatePreset = 'today' | 'week' | 'month' | 'all';
 type ViewMode = 'by-store' | 'all-entries';
@@ -111,6 +112,7 @@ export function PurchasesPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('by-store');
   const [drillSource, setDrillSource] = useState<string | null>(null);
   const [payPurchase, setPayPurchase] = useState<DailyPurchase | null>(null);
+  const [payStore, setPayStore] = useState<PurchaseSourceSummary | null>(null);
 
   const debouncedSearch = useDebouncedValue(search, 300);
   const range = presetRange(preset);
@@ -215,6 +217,22 @@ export function PurchasesPage() {
         ),
       },
       { accessorKey: 'entryCount', header: 'Entries' },
+      {
+        id: 'storePay',
+        header: '',
+        cell: ({ row }) =>
+          row.original.pendingPaise > 0 ? (
+            <Button
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setPayStore(row.original);
+              }}
+            >
+              Pay now
+            </Button>
+          ) : null,
+      },
     ],
     [],
   );
@@ -348,38 +366,52 @@ export function PurchasesPage() {
 
         {viewMode === 'by-store' ? (
           <>
+            <p className="text-sm text-muted-foreground">
+              Tap <strong>Pay now</strong> on any store to pay partial or full pending. Use <strong>All</strong> dates to include old bills.
+            </p>
             <div className={cn('space-y-2 md:hidden transition-opacity', isRefreshing && 'opacity-80')}>
               {storeRows.length === 0 ? (
                 <p className="py-8 text-center text-sm text-muted-foreground">No data</p>
               ) : (
                 storeRows.map((store) => (
-                  <Card
-                    key={store.sourceName}
-                    className="cursor-pointer active:bg-muted/50"
-                    onClick={() => setDrillSource(store.sourceName)}
-                  >
+                  <Card key={store.sourceName} className="active:bg-muted/50">
                     <CardContent className="p-4">
-                      <p className="font-semibold">{store.sourceName}</p>
-                      <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <p className="text-muted-foreground">Purchased</p>
-                          <p className="font-medium tabular-nums">{formatInrFromPaise(store.totalPaise)}</p>
+                      <button
+                        type="button"
+                        className="w-full text-left"
+                        onClick={() => setDrillSource(store.sourceName)}
+                      >
+                        <p className="font-semibold">{store.sourceName}</p>
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <p className="text-muted-foreground">Purchased</p>
+                            <p className="font-medium tabular-nums">{formatInrFromPaise(store.totalPaise)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Pending</p>
+                            <p className={cn('font-medium tabular-nums', store.pendingPaise > 0 && 'text-amber-700')}>
+                              {formatInrFromPaise(store.pendingPaise)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Paid</p>
+                            <p className="font-medium tabular-nums text-emerald-700">{formatInrFromPaise(store.paidPaise)}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground">Entries</p>
+                            <p className="font-medium">{store.entryCount}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-muted-foreground">Pending</p>
-                          <p className={cn('font-medium tabular-nums', store.pendingPaise > 0 && 'text-amber-700')}>
-                            {formatInrFromPaise(store.pendingPaise)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Paid</p>
-                          <p className="font-medium tabular-nums text-emerald-700">{formatInrFromPaise(store.paidPaise)}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Entries</p>
-                          <p className="font-medium">{store.entryCount}</p>
-                        </div>
-                      </div>
+                      </button>
+                      {store.pendingPaise > 0 && (
+                        <Button
+                          className="mt-3 w-full"
+                          size="sm"
+                          onClick={() => setPayStore(store)}
+                        >
+                          Pay store now
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 ))
@@ -400,7 +432,7 @@ export function PurchasesPage() {
                   <TableBody>
                     {storeTable.getRowModel().rows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground">No data</TableCell>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground">No data</TableCell>
                       </TableRow>
                     ) : (
                       storeTable.getRowModel().rows.map((row) => (
@@ -494,6 +526,14 @@ export function PurchasesPage() {
           </>
         )}
       </div>
+
+      {payStore && (
+        <PayStoreDialog
+          store={payStore}
+          open={!!payStore}
+          onOpenChange={(open) => !open && setPayStore(null)}
+        />
+      )}
 
       {payPurchase && (
         <RecordPaymentDialog

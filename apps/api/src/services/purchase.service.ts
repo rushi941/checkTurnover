@@ -247,4 +247,12 @@ export async function listPurchaseSources(shopId: string) {
   return rows.map((r) => r.name);
 }
 
-export { recordPayment, listPayments, markPurchasePaid, markPurchaseUnpaid, setPurchasePaidAmount } from './payment.service.js';
+export {
+  recordPayment,
+  listPayments,
+  markPurchasePaid,
+  markPurchaseUnpaid,
+  setPurchasePaidAmount,
+  getStorePendingPaise,
+  recordStorePayment,
+} from './payment.service.js';

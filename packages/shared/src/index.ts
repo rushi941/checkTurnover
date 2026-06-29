@@ -121,6 +121,13 @@ export interface PurchaseSourceSummary {
   lastPurchaseDate: string;
 }
 
+export interface StorePaymentResult {
+  sourceName: string;
+  paidPaise: number;
+  billsUpdated: number;
+  remainingPendingPaise: number;
+}
+
 export interface PurchasesSummary {
   totalPaise: number;
   totalPaidPaise: number;

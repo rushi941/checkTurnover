@@ -13,6 +13,8 @@ import {
   markPurchasePaid,
   markPurchaseUnpaid,
   setPurchasePaidAmount,
+  getStorePendingPaise,
+  recordStorePayment,
 } from '../services/purchase.service.js';
 import { upsertVakro, getVakro } from '../services/vakro.service.js';
 import { getDashboard, getMonthlyReport } from '../services/dashboard.service.js';
@@ -47,6 +49,14 @@ const purchaseSchema = z.object({
   date: isoDateSchema.optional(),
   note: z.string().optional(),
   paidAmount: z.number().min(0).optional(),
+});
+
+const payStoreSchema = z.object({
+  sourceName: z.string().min(1),
+  amount: z.number().positive(),
+  paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  paymentMode: z.enum(['cash', 'upi', 'card', 'bank']).optional(),
+  note: z.string().optional(),
 });
 
 const setPaidAmountSchema = z.object({
@@ -144,6 +154,44 @@ shopRouter.get('/purchases/sources', async (req, res, next) => {
     const sources = await listPurchaseSources(getShopId(req));
     res.json({ data: sources });
   } catch (err) {
+    next(err);
+  }
+});
+
+shopRouter.get('/purchases/store-pending', async (req, res, next) => {
+  try {
+    const source = req.query.source as string | undefined;
+    if (!source?.trim()) {
+      res.status(400).json({ error: 'source query required', code: 'VALIDATION' });
+      return;
+    }
+    const pendingPaise = await getStorePendingPaise(getShopId(req), source);
+    res.json({ data: { sourceName: source.trim(), pendingPaise } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+shopRouter.post('/purchases/pay-store', async (req, res, next) => {
+  try {
+    const parsed = payStoreSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Validation failed', code: 'VALIDATION' });
+      return;
+    }
+    const data = await recordStorePayment(getShopId(req), parsed.data);
+    res.status(201).json({ data });
+  } catch (err) {
+    if (err instanceof Error) {
+      if (err.message.includes('exceeds pending') || err.message.includes('No pending')) {
+        res.status(400).json({ error: err.message, code: 'INVALID_PAYMENT' });
+        return;
+      }
+      if (err.message.includes('must be greater')) {
+        res.status(400).json({ error: err.message, code: 'VALIDATION' });
+        return;
+      }
+    }
     next(err);
   }
 });

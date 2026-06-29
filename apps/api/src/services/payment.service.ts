@@ -214,3 +214,113 @@ export async function setPurchasePaidAmount(
     client.release();
   }
 }
+
+export async function getStorePendingPaise(shopId: string, sourceName: string): Promise<number> {
+  const { rows } = await pool.query<{ pending: string }>(
+    `SELECT COALESCE(SUM(amount_paise - paid_amount_paise), 0)::text AS pending
+     FROM daily_purchases
+     WHERE shop_id = $1 AND source_name = $2 AND paid_amount_paise < amount_paise`,
+    [shopId, sourceName.trim()],
+  );
+  return Number(rows[0].pending);
+}
+
+/** Pay an amount against a store — oldest pending bills first (FIFO). */
+export async function recordStorePayment(
+  shopId: string,
+  input: {
+    sourceName: string;
+    amount: number;
+    paymentDate?: string;
+    paymentMode?: string;
+    note?: string;
+  },
+) {
+  const paymentPaise = rupeesToPaise(input.amount);
+  if (paymentPaise <= 0) {
+    throw new Error('Payment amount must be greater than 0');
+  }
+
+  const paymentDate = input.paymentDate ?? todayIso();
+  const paymentMode = input.paymentMode ?? 'cash';
+  const sourceName = input.sourceName.trim();
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const pendingRes = await client.query<{
+      id: string;
+      amount_paise: string;
+      paid_amount_paise: string;
+    }>(
+      `SELECT id, amount_paise, paid_amount_paise
+       FROM daily_purchases
+       WHERE shop_id = $1 AND source_name = $2 AND paid_amount_paise < amount_paise
+       ORDER BY date ASC, created_at ASC
+       FOR UPDATE`,
+      [shopId, sourceName],
+    );
+
+    if (pendingRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      throw new Error('No pending bills for this store');
+    }
+
+    const totalPendingPaise = pendingRes.rows.reduce(
+      (sum, row) => sum + Number(row.amount_paise) - Number(row.paid_amount_paise),
+      0,
+    );
+
+    if (paymentPaise > totalPendingPaise) {
+      await client.query('ROLLBACK');
+      throw new Error(`Payment exceeds pending amount (${totalPendingPaise / 100} ₹)`);
+    }
+
+    let remainingPaise = paymentPaise;
+    let billsUpdated = 0;
+
+    for (const row of pendingRes.rows) {
+      if (remainingPaise <= 0) break;
+
+      const billPending = Number(row.amount_paise) - Number(row.paid_amount_paise);
+      const applyPaise = Math.min(remainingPaise, billPending);
+
+      await client.query(
+        `INSERT INTO purchase_payments (purchase_id, shop_id, amount_paise, payment_date, payment_mode, note)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          row.id,
+          shopId,
+          applyPaise,
+          paymentDate,
+          paymentMode,
+          input.note ?? `Store payment — ${sourceName}`,
+        ],
+      );
+
+      await client.query(
+        `UPDATE daily_purchases
+         SET paid_amount_paise = paid_amount_paise + $1, updated_at = NOW()
+         WHERE id = $2 AND shop_id = $3`,
+        [applyPaise, row.id, shopId],
+      );
+
+      remainingPaise -= applyPaise;
+      billsUpdated += 1;
+    }
+
+    await client.query('COMMIT');
+    return {
+      sourceName,
+      paidPaise: paymentPaise,
+      billsUpdated,
+      remainingPendingPaise: totalPendingPaise - paymentPaise,
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
