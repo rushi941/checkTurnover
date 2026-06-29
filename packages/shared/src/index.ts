@@ -133,6 +133,21 @@ export interface DailyVakro {
   createdAt: string;
 }
 
+/** Date-wise Vakro with supplier payments & kharcho auto-deducted for net cash. */
+export interface VakroDayRow {
+  date: string;
+  vakroPaise: number | null;
+  supplierPaidPaise: number;
+  kharchoPaise: number;
+  netCashPaise: number | null;
+  note: string | null;
+  vakroEntered: boolean;
+}
+
+export interface VakroDayDetail extends VakroDayRow {
+  vakro: DailyVakro | null;
+}
+
 export interface DashboardData {
   date: string;
   totalPurchasesPaise: number;

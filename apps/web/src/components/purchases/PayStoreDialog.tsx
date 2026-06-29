@@ -82,6 +82,8 @@ export function PayStoreDialog({ store, open, onOpenChange }: Props) {
       qc.invalidateQueries({ queryKey: ['purchases-summary'] });
       qc.invalidateQueries({ queryKey: ['store-pending'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['vakro-list'] });
+      qc.invalidateQueries({ queryKey: ['vakro-detail'] });
       onOpenChange(false);
     },
     onError: (e: Error) => toast.error(e.message),

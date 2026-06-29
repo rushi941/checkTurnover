@@ -63,6 +63,8 @@ export function RecordPaymentDialog({ purchase, open, onOpenChange }: Props) {
     qc.invalidateQueries({ queryKey: ['purchases'] });
     qc.invalidateQueries({ queryKey: ['purchases-summary'] });
     qc.invalidateQueries({ queryKey: ['dashboard'] });
+    qc.invalidateQueries({ queryKey: ['vakro-list'] });
+    qc.invalidateQueries({ queryKey: ['vakro-detail'] });
   };
 
   const payMutation = useMutation({

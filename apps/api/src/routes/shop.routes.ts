@@ -16,7 +16,7 @@ import {
   getStorePendingPaise,
   recordStorePayment,
 } from '../services/purchase.service.js';
-import { upsertVakro, getVakro } from '../services/vakro.service.js';
+import { upsertVakro, getVakro, getVakroDayDetail, listVakroByDate } from '../services/vakro.service.js';
 import { getDashboard, getMonthlyReport } from '../services/dashboard.service.js';
 import { getAiTurnoverAnalysis } from '../modules/ai/turnover.service.js';
 import { getCalendarMonth } from '../modules/calendar/calendar.service.js';
@@ -32,7 +32,7 @@ import {
 } from '../services/kharcho.service.js';
 import { createInvoice, listInvoices, getShopForInvoice } from '../services/invoice.service.js';
 import { getPurchaseId, getKharchoId, getShopId } from '../utils/params.js';
-import { isDateNotFuture, isValidIsoDate, todayIso, currentMonth } from '../utils/dates.js';
+import { isDateNotFuture, isValidIsoDate, todayIso, currentMonth, monthStart } from '../utils/dates.js';
 
 export const shopRouter = Router({ mergeParams: true });
 
@@ -326,6 +326,35 @@ shopRouter.put('/purchases/:purchaseId/paid-amount', async (req, res, next) => {
       res.status(400).json({ error: err.message, code: 'INVALID_PAID_AMOUNT' });
       return;
     }
+    next(err);
+  }
+});
+
+shopRouter.get('/vakro/list', async (req, res, next) => {
+  try {
+    const from = (req.query.from as string) ?? monthStart(currentMonth());
+    const to = (req.query.to as string) ?? todayIso();
+    if (!isValidIsoDate(from) || !isValidIsoDate(to)) {
+      res.status(400).json({ error: 'Invalid date range', code: 'VALIDATION' });
+      return;
+    }
+    const data = await listVakroByDate(getShopId(req), from, to);
+    res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+});
+
+shopRouter.get('/vakro/detail', async (req, res, next) => {
+  try {
+    const date = (req.query.date as string) ?? todayIso();
+    if (!isValidIsoDate(date)) {
+      res.status(400).json({ error: 'Invalid date format', code: 'VALIDATION' });
+      return;
+    }
+    const data = await getVakroDayDetail(getShopId(req), date);
+    res.json({ data });
+  } catch (err) {
     next(err);
   }
 });

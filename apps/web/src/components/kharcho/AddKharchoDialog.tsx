@@ -79,6 +79,8 @@ export function AddKharchoDialog({
       qc.invalidateQueries({ queryKey: ['kharcho'] });
       qc.invalidateQueries({ queryKey: ['kharcho-summary'] });
       qc.invalidateQueries({ queryKey: ['monthly-report'] });
+      qc.invalidateQueries({ queryKey: ['vakro-list'] });
+      qc.invalidateQueries({ queryKey: ['vakro-detail'] });
       setOpen(false);
       if (!isEdit) {
         setCategory('bill');
